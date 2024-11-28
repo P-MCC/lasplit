@@ -1,6 +1,6 @@
 # La-Split
 
-La-Split CLI tool is used to split dataset for the purpose of training Deep-Learning / Computer Vision models.
+La-Split CLI Tool / Python Library is used to split dataset for the purpose of training Deep-Learning / Computer Vision models.
 
 # **In Progress...**
 
