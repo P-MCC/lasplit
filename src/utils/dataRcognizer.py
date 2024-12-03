@@ -2,19 +2,23 @@ import os
 import mimetypes
 
 
+import os
+
 class DatasetTypeDetector:
     VALID_IMAGE_EXTENSIONS = {
         ".jpg", ".jpeg", ".gif", ".bmp", ".tif", ".tiff",
         ".webp", ".svg", ".heif", ".heic", ".cr2", ".nef",
         ".arw", ".dng"
     }
-
+    
+    LABEL_FILE_EXTENSIONS = {".txt", ".xml", ".json", ".yaml"}
+    
     def __init__(self, path):
         self.path = path
 
     def is_image_classification_dataset(self):
         """
-        Detect if the provided path is an image classification dataset.
+        Detect if the provided path is a valid image classification dataset.
         """
         if not os.path.exists(self.path):
             return False
@@ -23,41 +27,22 @@ class DatasetTypeDetector:
         if not subdirs:
             return False
 
-        classification_structure = False
-
+        # Check if each subdirectory represents a class with only valid images and no labels
         for subdir in subdirs:
             subdir_path = os.path.join(self.path, subdir)
 
-            if self._is_class_subdirectory(subdir_path):
-                classification_structure = True
-            elif self._is_train_test_val_structure(subdir_path):
-                classification_structure = True
+            if not self._is_class_subdirectory(subdir_path):
+                return False
 
-        return classification_structure
+        return True
 
     def _is_class_subdirectory(self, path):
         """
-        Check if a directory contains only image files and no other file types.
+        Check if a directory contains only image files and no label files.
         """
         for root, _, files in os.walk(path):
             for file in files:
-                if not self._is_valid_image_file(file):
-                    return False
-        return True
-
-    def _is_train_test_val_structure(self, path):
-        """
-        Check if the directory contains subdirectories like train, test, or val
-        and those subdirectories contain class subdirectories with valid image files.
-        """
-        train_test_val = ["train", "test", "val"]
-        for ttv in train_test_val:
-            ttv_path = os.path.join(path, ttv)
-            if os.path.exists(ttv_path) and os.path.isdir(ttv_path):
-                subdirs = [d for d in os.listdir(ttv_path) if os.path.isdir(os.path.join(ttv_path, d))]
-                if not subdirs:
-                    return False
-                if any(not self._is_class_subdirectory(os.path.join(ttv_path, subdir)) for subdir in subdirs):
+                if self._is_label_file(file) or not self._is_valid_image_file(file):
                     return False
         return True
 
@@ -68,6 +53,23 @@ class DatasetTypeDetector:
         _, ext = os.path.splitext(filename)
         return ext.lower() in self.VALID_IMAGE_EXTENSIONS
 
+    def _is_label_file(self, filename):
+        """
+        Check if a file is a label or annotation file based on its extension.
+        """
+        _, ext = os.path.splitext(filename)
+        return ext.lower() in self.LABEL_FILE_EXTENSIONS
+
+    def contains_label_files(self, path):
+        """
+        Check if the dataset contains label files like .txt, .xml, .json, or .yaml.
+        """
+        for root, _, files in os.walk(path):
+            for file in files:
+                if self._is_label_file(file):
+                    return True
+        return False
+    
     def contains_metadata_file(self):
         """
         Check if the dataset contains metadata files like .csv, .txt, or .pt.
@@ -78,6 +80,7 @@ class DatasetTypeDetector:
                 if os.path.splitext(file)[1].lower() in metadata_extensions:
                     return True
         return False
+
     
 def print_folder_structure(path, indent=""):
     """
@@ -106,10 +109,49 @@ def print_folder_structure(path, indent=""):
             print_folder_structure(item_path, next_indent)
         else:
             print(f"{indent}{prefix}{item}")
+            
+def print_folder_structure_short(path, indent="", max_items=5):
+    """
+    Print the folder structure of the given path in a tree-like format,
+    displaying up to max_items per directory.
+
+    Args:
+        path (str): The root directory path.
+        indent (str): The indentation used for formatting the structure.
+        max_items (int): Maximum number of items to display per folder level.
+    """
+    # Get the list of files and directories
+    items = sorted(os.listdir(path))
+
+    # Determine how many items to display, limited to max_items
+    items_to_display = items[:max_items]
+    more_items = len(items) > max_items
+
+    for i, item in enumerate(items_to_display):
+        item_path = os.path.join(path, item)
+
+        # Check if it's the last item to adjust the visual display
+        if i == len(items_to_display) - 1 and not more_items:
+            prefix = "└── "
+            next_indent = indent + "    "
+        else:
+            prefix = "├── "
+            next_indent = indent + "│   "
+
+        # Print the current item
+        if os.path.isdir(item_path):
+            print(f"{indent}{prefix}{item}/")
+            print_folder_structure_short(item_path, next_indent, max_items)
+        else:
+            print(f"{indent}{prefix}{item}")
+
+    # If there are more items, indicate them with '...'
+    if more_items:
+        print(f"{indent}└── ... ({len(items) - max_items} more items)")
 
 
 # Example usage:
-path = r"M:\Codes-Scripts\ALL_Classification\Data\ALL-IDB1_70Train_30Test"
+path = r"M:\Datasets\coco128-seg"
 detector = DatasetTypeDetector(path)
 
 if detector.is_image_classification_dataset():
@@ -119,5 +161,5 @@ if detector.is_image_classification_dataset():
 else:
     print(f"{path} is not a valid image classification dataset.")
     
-print(f"Folder structure for '{path}':")
-print_folder_structure(path)
+# print(f"Folder structure for '{path}':")
+# print_folder_structure_short(path)
